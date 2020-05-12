@@ -16,11 +16,11 @@ As the credentials used to access downloads.f5.com are stored in the script, I r
 creating a new set of credentials for this purpose, and only using those credentials for 
 this purpose.
 
-Set the variables
-  downloads_user=""
-  downloads_password=""
-  downloads_from="USA - WEST COAST"
-  proxy_opts=""
+Set the variables  
+  downloads_user=""  
+  downloads_password=""  
+  downloads_from="USA - WEST COAST"  
+  proxy_opts=""  
 
 The script logs into /var/log/ltm when it runs, downloads and installs the database.
 It also logs errors, such as login failure and database backup errors.
