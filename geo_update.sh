@@ -41,10 +41,10 @@ downloads_from="USA - WEST COAST"
 # "" for direct connect
 proxy_opts=""
 # get the login page
-loginpage=$(curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent https://downloads.f5.com/esd/ecc.sv?$container 2>&1 | grep "action=" | awk -F'[=\"|\">]' '{ print $3 }' )
+loginpage=$(curl -m 10 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent https://downloads.f5.com/esd/ecc.sv?$container 2>&1 | grep "action=" | awk -F'[=\"|\">]' '{ print $3 }' )
 # echo $loginpage
 # submit the credentials
-afterlogin=$(curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent $loginpage -X POST --data-urlencode "userid=$downloads_user" --data-urlencode "passwd=$downloads_password" 2>&1 | grep "F5 Networks - My Account" | awk -F'[="|">]' '{ print $6 }' )
+afterlogin=$(curl -m 10 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent $loginpage -X POST --data-urlencode "userid=$downloads_user" --data-urlencode "passwd=$downloads_password" 2>&1 | grep "F5 - My Account" | awk -F'[="|">]' '{ print $6 }' )
 # echo $afterlogin
 if [[ $afterlogin == "" ]]; then
   logger -p local0.err "Geolocation update file check - login failure"
@@ -54,25 +54,28 @@ fi
 # back to the geolocation container
 target_container="https://downloads.f5.com/esd/ecc.sv?$container"
 # echo $target_container
-mycontainer=$(curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent $target_container 2>&1 )
+mycontainer=$(curl -m 10 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent $target_container 2>&1 )
 # send the EULA accept
 eula_path="https://downloads.f5.com/esd/eula.sv?$container&path=&file=&B1=I+Accept"
 # echo $eula_path
-servedownload=$(curl -m 5 --connect-timeout 2 --no-keepalive -kvLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent --ignore-content-length "$eula_path" 2>&1 | grep -e "href\=.*zip\'" | awk -F"[<|>]" '{print $2}' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F"'" '{ print $2 }' )
+servedownload=$(curl -m 10 --connect-timeout 2 --no-keepalive -kvLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent --ignore-content-length "$eula_path" 2>&1 | grep -e "href\=.*zip\'" | awk -F"[<|>]" '{print $2}' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F"'" '{ print $2 }' )
 # echo $servedownload
 # get the AWS zip location
 target_zip="https://downloads.f5.com/esd/$servedownload"
-selected_zip=$(curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent "$target_zip" 2>&1 | grep -e "href.*${downloads_from}" | awk -F'[<|>]' '{ print $6 } ' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F'"' '{ print $2 }' )
+# echo $target_zip
+selected_zip=$(curl -m 10 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent "$target_zip" 2>&1 | grep -e "href.*${downloads_from}" | awk -F'[<|>]' '{ print $6 } ' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F'"' '{ print $2 }' )
 # echo $selected_zip
-zip_file_name=$( echo $selected_zip | awk -F'[?]' '{ print $1 }' | awk -F'[/]' '{ print $4 }' | awk -FF '{ print $6 }' )
+zip_file_name=$( echo $selected_zip | awk -F'[?]' '{ print $1 }' | awk -F'[/]' '{ print $NF }' )
+# echo $zip_file_name
 if [[ ! -e $zip_file_name ]]; then
 	logger -p local0.notice "Geolocation update file check - downloading update $zip_file_name"
-	curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent -o "$base_dir/$zip_file_name" "$selected_zip" 2>&1
+	curl -m 30 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent -o "$base_dir/$zip_file_name" "$selected_zip" 2>&1
 	md5servedownload=$(curl -m 5 --connect-timeout 2 --no-keepalive -kvLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent --ignore-content-length "$eula_path" 2>&1 | grep -e "href\=.*zip.md5\'" | awk -F"[<|>]" '{print $2}' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F"'" '{ print $2 }' )
 	target_md5="https://downloads.f5.com/esd/$md5servedownload"
-	selected_md5=$(curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent "$target_md5" 2>&1 | grep -e "href.*${downloads_from}" | awk -F'[<|>]' '{ print $6 } ' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F'"' '{ print $2 }' )
-	md5_file_name=$( echo $selected_md5 | awk -F'[?]' '{ print $1 }' | awk -F'[/]' '{ print $4 }' | awk -FF '{ print $6 }' )
-	curl -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent -o "$base_dir/$md5_file_name" "$selected_md5" 2>&1
+	selected_md5=$(curl -m 5 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent "$target_md5" 2>&1 | grep -e "href.*${downloads_from}" | awk -F'[<|>]' '{ print $6 } ' | awk -F'=' '{ st = index($0,"="); print substr($0,st+1) }' | awk -F'"' '{ print $2 }' )
+	md5_file_name=$( echo $selected_md5 | awk -F'[?]' '{ print $1 }' | awk -F'[/]' '{ print $NF }' )
+	# echo $md5_file_name
+	curl -m 30 --connect-timeout 2 --no-keepalive -kLb $base_dir/geo_cookies.txt -c $base_dir/geo_cookies.txt $proxy_opts --silent -o "$base_dir/$md5_file_name" "$selected_md5" 2>&1
 	if md5sum --status -c $md5_file_name; then
 	  logger -p local0.notice "Geolocation update file check - installing update $zip_file_name"
 	  unzip -qq "$base_dir/$zip_file_name" 2>&1 > /dev/null
